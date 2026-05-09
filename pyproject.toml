@@ -15,4 +15,8 @@ dependencies = [
     "pydantic>=2.12.5",
     "pydub>=0.25.1",
     "python-dotenv>=1.2.2",
+    "uvicorn>=0.34.0",
+    "openai>=2.0.0",
+    "pinecone>=7.0.0",
+    "yt-dlp>=2024.1.1",
 ]
