@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from core import (
     get_podcast_info, download_and_split_mp3, download_transcript,
-    get_youtube_info, get_youtube_subtitles, download_youtube_audio,
+    get_youtube_info, get_youtube_channel_info, get_youtube_subtitles, download_youtube_audio,
     simple_summarize, save_episode_to_pinecone, chat_with_episode, search_episodes,
     client, TMP_DIR, MAX_WHISPER_MINUTES
 )
@@ -47,6 +47,10 @@ def api_get_podcast(rss_url: str):
 @app.get("/youtube/info")
 async def api_youtube_info(url: str):
     return await asyncio.to_thread(get_youtube_info, unquote(url))
+
+@app.get("/youtube/channel")
+async def api_youtube_channel(url: str):
+    return await asyncio.to_thread(get_youtube_channel_info, unquote(url))
 
 
 class ChatRequest(BaseModel):

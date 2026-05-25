@@ -367,6 +367,40 @@ def download_youtube_audio(url: str):
 
 
 # --------------------------------
+#  YouTube：取得頻道影片列表
+# --------------------------------
+def get_youtube_channel_info(url: str, max_videos: int = 20) -> dict:
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": "in_playlist",
+        "playlistend": max_videos,
+    }
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+
+    channel_title = info.get("title", "YouTube 頻道")
+    entries = info.get("entries") or []
+
+    videos = []
+    for entry in entries:
+        if not entry:
+            continue
+        video_id = entry.get("id", "")
+        upload_date = entry.get("upload_date", "")
+        if upload_date and len(upload_date) == 8:
+            upload_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
+        videos.append({
+            "title": entry.get("title", "未知標題"),
+            "url": f"https://www.youtube.com/watch?v={video_id}",
+            "duration": entry.get("duration", 0),
+            "upload_date": upload_date,
+        })
+
+    return {"channel_title": channel_title, "videos": videos}
+
+
+# --------------------------------
 #  儲存集數至 Pinecone
 # --------------------------------
 def save_episode_to_pinecone(text: str, episode_url: str, episode_title: str = "", podcast_title: str = ""):
