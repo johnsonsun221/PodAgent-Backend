@@ -367,6 +367,56 @@ def download_youtube_audio(url: str):
 
 
 # --------------------------------
+#  儲存集數至 Pinecone
+# --------------------------------
+def save_episode_to_pinecone(text: str, episode_url: str, episode_title: str = "", podcast_title: str = ""):
+    from langchain_core.documents import Document
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    chunks = splitter.split_text(text)
+    meta = {"episode_url": episode_url, "episode_title": episode_title, "podcast_title": podcast_title}
+    docs = [Document(page_content=c, metadata=meta) for c in chunks]
+    vectorstore.add_documents(docs)
+
+
+# --------------------------------
+#  對單集問答（RAG）
+# --------------------------------
+def chat_with_episode(question: str, episode_url: str) -> str:
+    docs = vectorstore.similarity_search(question, k=5, filter={"episode_url": episode_url})
+    if not docs:
+        return "找不到相關內容，請先分析這集。"
+    context = "\n\n".join(d.page_content for d in docs)
+    prompt = f"""你是 Podcast 內容助手。根據以下節目內容回答問題，用繁體中文回答，簡潔清晰。
+
+內容：
+{context}
+
+問題：{question}"""
+    return llm.invoke([HumanMessage(content=prompt)]).content
+
+
+# --------------------------------
+#  跨集搜尋
+# --------------------------------
+def search_episodes(query: str, k: int = 10) -> list:
+    docs = vectorstore.similarity_search(query, k=k)
+    seen = set()
+    results = []
+    for doc in docs:
+        ep_url = doc.metadata.get("episode_url", "")
+        if ep_url in seen:
+            continue
+        seen.add(ep_url)
+        results.append({
+            "episode_url": ep_url,
+            "episode_title": doc.metadata.get("episode_title", "未知集數"),
+            "podcast_title": doc.metadata.get("podcast_title", ""),
+            "excerpt": doc.page_content[:200],
+        })
+    return results
+
+
+# --------------------------------
 #  YouTube VTT 解析（處理自動字幕重複行）
 # --------------------------------
 def _parse_youtube_vtt(content: str) -> str:

@@ -12,7 +12,8 @@ from pydantic import BaseModel
 from core import (
     get_podcast_info, download_and_split_mp3, download_transcript,
     get_youtube_info, get_youtube_subtitles, download_youtube_audio,
-    simple_summarize, client, TMP_DIR, MAX_WHISPER_MINUTES
+    simple_summarize, save_episode_to_pinecone, chat_with_episode, search_episodes,
+    client, TMP_DIR, MAX_WHISPER_MINUTES
 )
 
 app = FastAPI(title="Podcast API")
@@ -48,12 +49,26 @@ async def api_youtube_info(url: str):
     return await asyncio.to_thread(get_youtube_info, unquote(url))
 
 
+class ChatRequest(BaseModel):
+    question: str
+    episode_url: str
+
+@app.post("/chat")
+def api_chat(req: ChatRequest):
+    return {"answer": chat_with_episode(req.question, req.episode_url)}
+
+@app.get("/search")
+def api_search(query: str):
+    return search_episodes(query)
+
 @app.get("/analyze/stream")
 async def api_analyze_stream(
     mp3_url: Optional[str] = None,
     youtube_url: Optional[str] = None,
     transcript_url: Optional[str] = None,
     transcript_type: Optional[str] = None,
+    episode_title: Optional[str] = None,
+    podcast_title: Optional[str] = None,
 ):
     if mp3_url:        mp3_url        = unquote(mp3_url)
     if youtube_url:    youtube_url    = unquote(youtube_url)
@@ -111,6 +126,8 @@ async def api_analyze_stream(
                     parts.append(await asyncio.to_thread(whisper_transcribe, c))
                 full_text = "\n".join(parts)
 
+            source_url = youtube_url or mp3_url or ""
+            await asyncio.to_thread(save_episode_to_pinecone, full_text, source_url, episode_title or "", podcast_title or "")
             yield evt("AI 生成摘要", 82)
             summary = await asyncio.to_thread(simple_summarize, full_text)
             yield evt("完成", 100, result=summary)
